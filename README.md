@@ -156,18 +156,22 @@ VALOR MAXIMO QUE NO TUMBA EL SERVICIO: <N> req/s
 > (los números dependen del hardware y de la config del jail). Guarda las salidas
 > `resultados-*.txt` como evidencia.
 
-| Servicio | Puerto | `maxretry`/`findtime` | Máx. que aguanta | Nivel que lo tumba/banea |
-|---|---|---|---|---|
-| Frontend (Next.js) | 3000 | 60 / 10s | _p. ej._ ___ req/s | ___ req/s |
-| Backend (FastAPI)  | 8001 | 60 / 10s | ___ req/s | ___ req/s |
-| API LDAP (JWT)     | 8000 | 60 / 10s | ___ req/s | ___ req/s |
+| Servicio | Puerto | Ruta probada | `maxretry`/`findtime` | Máx. que aguanta | Nivel que lo tumba/banea |
+|---|---|---|---|---|---|
+| Backend (FastAPI)  | 8001 | `/health` | 60 / 10s | **6 req/s** | 8 req/s |
+| Frontend (Next.js) | 3000 | `/login`  | 60 / 10s | ___ req/s | ___ req/s |
+| API LDAP (JWT)     | 8000 | `/health` | 60 / 10s | ___ req/s | ___ req/s |
+
+> **Backend (medido):** a 2/4/5/6 req/s todas las respuestas fueron 200 (AGUANTA);
+> a partir de 8 req/s aparece el ban de Fail2Ban (fallos de conexión 000) → el
+> máximo sostenible es **6 req/s**, justo el umbral de 60 peticiones / 10 s.
 
 Comando usado para cada fila (ruta `/health` que responde 200, tasas alrededor
 del umbral, y desbaneo entre niveles):
 ```bash
 python sweep.py 127.0.0.1 8001 --path /health --rates 2,4,5,6,8,10 --duration 15 \
     --reset-cmd "docker exec dashboard-backend-protected fail2ban-client unban --all"  --out resultados-backend.txt
-python sweep.py 127.0.0.1 3000 --path /health --rates 2,4,5,6,8,10 --duration 15 \
+python sweep.py 127.0.0.1 3000 --path /login  --rates 2,4,5,6,8,10 --duration 15 \
     --reset-cmd "docker exec dashboard-frontend-protected fail2ban-client unban --all" --out resultados-frontend.txt
 python sweep.py 127.0.0.1 8000 --path /health --rates 2,4,5,6,8,10 --duration 15 \
     --reset-cmd "docker exec ldap-oauth-api fail2ban-client unban --all"               --out resultados-ldap.txt
