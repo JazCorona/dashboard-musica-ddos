@@ -1,0 +1,7 @@
+# Salida de: docker logs openldap-fw
+# Proteccion a nivel de puerto para LDAPS (636) aplicada por el sidecar ldap-fw.
+[ldap-fw] Reglas de proteccion de puerto aplicadas sobre LDAPS/636:
+# Warning: iptables-legacy tables present, use iptables-legacy to see them
+1    ACCEPT     6    --  0.0.0.0/0            0.0.0.0/0            tcp dpt:636 ctstate RELATED,ESTABLISHED
+2    DROP       6    --  0.0.0.0/0            0.0.0.0/0            tcp dpt:636 ctstate NEW limit: above 30/min burst 15 mode srcip
+3    DROP       6    --  0.0.0.0/0            0.0.0.0/0            tcp dpt:636 #conn src/32 > 20

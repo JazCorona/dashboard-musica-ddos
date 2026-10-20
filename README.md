@@ -160,11 +160,27 @@ VALOR MAXIMO QUE NO TUMBA EL SERVICIO: <N> req/s
 |---|---|---|---|---|---|
 | Backend (FastAPI)  | 8001 | `/health` | 60 / 10s | **6 req/s** | 8 req/s |
 | Frontend (Next.js) | 3000 | `/login`  | 60 / 10s | **6 req/s** | 8 req/s |
-| API LDAP (JWT)     | 8000 | `/health` | 60 / 10s | ___ req/s | ___ req/s |
+| API LDAP (JWT)     | 8000 | `/health` | 60 / 10s | **6 req/s** | 8 req/s |
 
-> **Backend (medido):** a 2/4/5/6 req/s todas las respuestas fueron 200 (AGUANTA);
-> a partir de 8 req/s aparece el ban de Fail2Ban (fallos de conexión 000) → el
-> máximo sostenible es **6 req/s**, justo el umbral de 60 peticiones / 10 s.
+> **Resultado (medido en los 3 servicios):** a 2/4/5/6 req/s todas las respuestas
+> fueron 200 (AGUANTA); a partir de 8 req/s aparece el ban de Fail2Ban (fallos de
+> conexión 000) → el máximo sostenible es **6 req/s** en los tres, justo el umbral
+> de 60 peticiones / 10 s (`maxretry=60 / findtime=10s`). El valor es idéntico
+> porque los tres jails comparten la misma configuración; subiendo `maxretry` o
+> `findtime` cada servicio toleraría más carga antes del ban.
+>
+> Evidencia por servicio en [`resultados/`](resultados/):
+> `resultados-backend.txt`, `resultados-frontend.txt`, `resultados-ldap.txt`.
+
+### Evidencia de la protección de puerto TLS del LDAP (636)
+Reglas iptables aplicadas por el sidecar `ldap-fw` (salida de `docker logs openldap-fw`):
+```
+1  ACCEPT  tcp dpt:636 ctstate RELATED,ESTABLISHED
+2  DROP    tcp dpt:636 ctstate NEW limit: above 30/min burst 15 mode srcip
+3  DROP    tcp dpt:636 #conn src/32 > 20
+```
+Es decir: se permiten las conexiones TLS ya establecidas, se limita la **tasa** de
+conexiones nuevas por IP (30/min, ráfaga 15) y las **concurrentes** por IP (máx. 20).
 
 Comando usado para cada fila (ruta `/health` que responde 200, tasas alrededor
 del umbral, y desbaneo entre niveles):
