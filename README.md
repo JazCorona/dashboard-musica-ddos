@@ -115,11 +115,22 @@ Un nivel de carga se considera soportado si:
    ```
 
 ### Procedimiento automático (recomendado)
-`sweep.py` hace ese barrido solo y te da el número directamente:
+`sweep.py` hace ese barrido solo y te da el número directamente. Tres detalles
+clave para que la medición sea válida:
+
+1. **Pégale a una ruta que responda 200** (`--path /health`). Si usas `/` y el
+   servicio no tiene esa ruta, devuelve 404 y el barrido lo marca como "cae"
+   aunque esté sano.
+2. **Barre tasas alrededor del umbral del jail** (~6 req/s para
+   `maxretry=60/findtime=10s`), no muy por encima.
+3. **Desbanea entre niveles** con `--reset-cmd`: el ban dura 10 min, así que sin
+   esto el primer ban contamina todos los niveles siguientes.
 
 ```bash
-python sweep.py 127.0.0.1 8001 \
-    --rates 10,20,40,60,80,120,160 --duration 15 --out resultados-backend.txt
+python sweep.py 127.0.0.1 8001 --path /health \
+    --rates 2,4,5,6,8,10 --duration 15 \
+    --reset-cmd "docker exec dashboard-backend-protected fail2ban-client unban --all" \
+    --out resultados-backend.txt
 ```
 
 Imprime una tabla y la línea final:
@@ -128,10 +139,14 @@ Imprime una tabla y la línea final:
 VALOR MAXIMO QUE NO TUMBA EL SERVICIO: <N> req/s
 ```
 
-> Usa `--duration` ≥ `findtime` del jail (10 s) para que el ban alcance a
-> dispararse dentro de cada nivel, y deja el `--cooldown` (por defecto 20 s)
-> para que los bans cortos expiren o para desbanear a mano entre niveles:
-> `docker compose exec <servicio> fail2ban-client set http-flood unbanip <IP>`.
+> `--duration` ≥ `findtime` (10 s) para que el ban alcance a dispararse dentro de
+> cada nivel. El contenedor de cada servicio se llama `dashboard-backend-protected`,
+> `dashboard-frontend-protected` o `ldap-oauth-api` (ajusta el `--reset-cmd`).
+>
+> **Nota sobre la IP:** al pegarle desde el host a `localhost:puerto`, el NAT de
+> Docker hace que Nginx vea como origen el gateway de la red Docker, así que
+> Fail2Ban banea esa IP (y con ella todo el tráfico del host). Para que la prueba
+> sea por-IP real, corre el atacante como contenedor en la misma red (Opción B).
 
 ---
 
@@ -147,11 +162,15 @@ VALOR MAXIMO QUE NO TUMBA EL SERVICIO: <N> req/s
 | Backend (FastAPI)  | 8001 | 60 / 10s | ___ req/s | ___ req/s |
 | API LDAP (JWT)     | 8000 | 60 / 10s | ___ req/s | ___ req/s |
 
-Comando usado para cada fila:
+Comando usado para cada fila (ruta `/health` que responde 200, tasas alrededor
+del umbral, y desbaneo entre niveles):
 ```bash
-python sweep.py 127.0.0.1 3000 --path /login --rates 10,20,40,60,80,120 --duration 15 --out resultados-frontend.txt
-python sweep.py 127.0.0.1 8001                --rates 10,20,40,60,80,120 --duration 15 --out resultados-backend.txt
-python sweep.py 127.0.0.1 8000                --rates 10,20,40,60,80,120 --duration 15 --out resultados-ldap.txt
+python sweep.py 127.0.0.1 8001 --path /health --rates 2,4,5,6,8,10 --duration 15 \
+    --reset-cmd "docker exec dashboard-backend-protected fail2ban-client unban --all"  --out resultados-backend.txt
+python sweep.py 127.0.0.1 3000 --path /health --rates 2,4,5,6,8,10 --duration 15 \
+    --reset-cmd "docker exec dashboard-frontend-protected fail2ban-client unban --all" --out resultados-frontend.txt
+python sweep.py 127.0.0.1 8000 --path /health --rates 2,4,5,6,8,10 --duration 15 \
+    --reset-cmd "docker exec ldap-oauth-api fail2ban-client unban --all"               --out resultados-ldap.txt
 ```
 
 **Interpretación esperada:** como el jail banea con ~6 req/s sostenidas durante

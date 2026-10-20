@@ -20,6 +20,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import subprocess
 import time
 from datetime import datetime
 
@@ -38,8 +39,12 @@ def parse_args() -> argparse.Namespace:
                    help="Segundos por nivel (>= findtime de Fail2Ban para que el ban alcance a dispararse)")
     p.add_argument("--fail-threshold", type=float, default=5.0,
                    help="%% de respuestas NO-200 tolerado para considerar que 'aguanta'")
-    p.add_argument("--cooldown", type=int, default=20,
-                   help="Pausa entre niveles (deja expirar bans cortos / libera conexiones)")
+    p.add_argument("--cooldown", type=int, default=5,
+                   help="Pausa entre niveles (libera conexiones)")
+    p.add_argument("--reset-cmd", default=None,
+                   help="Comando a ejecutar ANTES de cada nivel para desbanear "
+                        "(ej.: \"docker exec dashboard-backend-protected fail2ban-client unban --all\"). "
+                        "Sin esto, el ban de 10 min contamina los niveles siguientes.")
     p.add_argument("--out", default=None, help="Archivo donde guardar la tabla de resultados")
     return p.parse_args()
 
@@ -57,6 +62,11 @@ def main() -> None:
           f"umbral NO-200: {args.fail_threshold}%\n")
 
     for rate in rates:
+        # Desbanea antes de cada nivel para medirlo limpio (el ban dura 10 min).
+        if args.reset_cmd:
+            subprocess.run(args.reset_cmd, shell=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1)
         counts = run_test(args.host, args.port, args.path,
                           concurrency=min(args.concurrency, rate * 2),
                           rate=rate, duration=args.duration, quiet=True)
