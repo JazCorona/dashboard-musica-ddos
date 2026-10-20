@@ -159,7 +159,7 @@ VALOR MAXIMO QUE NO TUMBA EL SERVICIO: <N> req/s
 | Servicio | Puerto | Ruta probada | `maxretry`/`findtime` | Máx. que aguanta | Nivel que lo tumba/banea |
 |---|---|---|---|---|---|
 | Backend (FastAPI)  | 8001 | `/health` | 60 / 10s | **6 req/s** | 8 req/s |
-| Frontend (Next.js) | 3000 | `/login`  | 60 / 10s | ___ req/s | ___ req/s |
+| Frontend (Next.js) | 3000 | `/login`  | 60 / 10s | **6 req/s** | 8 req/s |
 | API LDAP (JWT)     | 8000 | `/health` | 60 / 10s | ___ req/s | ___ req/s |
 
 > **Backend (medido):** a 2/4/5/6 req/s todas las respuestas fueron 200 (AGUANTA);
